@@ -18,6 +18,21 @@ def fill_array(array, init, final)
     return a
 end
 
+# normalizar utilizando min-max 
+def normalize(arr, col)
+    max = arr[0][col]
+    min = arr[0][col]
+    for i in 1..arr.count-1
+        min = arr[i][col] if arr[i][col] < min 
+        max = arr[i][col] if arr[i][col] > max
+    end
+    for i in 0..arr.count-1
+        arr[i][col] = (arr[i][col]-min).to_f / (max-min).to_f
+    end
+    return arr
+end
+
+# converter resultados
 def result_convert(num)
     if num == 1
         return [ 1,-1,-1]
@@ -28,6 +43,7 @@ def result_convert(num)
     end
 end
 
+# inicializar o pesos com zero
 def init_weights
     weights = []
     for i in 0..2 
@@ -41,6 +57,9 @@ end
 
 #todos dados
 all_data = read_file('cmc.data.txt')
+
+# normarlizar os dados do primeiro atributo
+all_data = normalize(all_data, 0)
 
 # dados treino
 #      classe 1: 0   - 414
@@ -60,7 +79,13 @@ def perceptron(array_data, is_test, tmax)
         if is_test
             line = t-1
         else
-            line = Random.rand(0..999)
+            if t%3 == 1
+                line = Random.rand(0..414)
+            elsif t%3 == 2
+                line = Random.rand(415..641)
+            else
+                line = Random.rand(642..999)
+            end
         end
 
         x = []
@@ -81,6 +106,18 @@ def perceptron(array_data, is_test, tmax)
         y = []
         y_in.each { |i| y << (i >= 0 ? 1 : -1) }
 
+        if y == [-1,-1,-1]
+            min = y_in[0].abs
+            min_index = 0
+            for i in 1..2
+                if y_in[i].abs < min
+                    min = y_in[i].abs
+                    min_index = i
+                end
+            end
+            y[min_index] = 1
+        end
+
         if y != se && !is_test
             for i in 0..2
                 for j in 0..8
@@ -94,5 +131,5 @@ def perceptron(array_data, is_test, tmax)
     puts "Porcentagem de acerto -> #{ 100* @right_answers /tmax }%" if is_test
 end
 
-perceptron(trainning, false, 100)
+perceptron(trainning, false, 5000)
 perceptron(test, true, test.count)
