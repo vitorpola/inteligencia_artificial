@@ -55,10 +55,7 @@ def init_weights(row, col, random)
     weights
 end
 
-def perceptron(array_data, is_test, tmax)
-    x_count = 9
-    y_count = 3
-
+def mlp(array_data, is_test, tmax, hn)
     right_answers = 0 if is_test
     for t in 1..tmax
         if is_test
@@ -74,46 +71,76 @@ def perceptron(array_data, is_test, tmax)
         end
 
         x = []
-        for i in 0..x_count-1 
+        for i in 0..8 
             x << array_data[line][i]
         end
         x << 1
-        se = result_convert(array_data[line][x_count])
+        se = result_convert(array_data[line][9])
 
-        y_in = [0,0,0]
-
-        for i in 0..y_count-1
-            for j in 0..x_count
-                y_in[i] += x[j] * @weights[i][j]
+        z = []
+        for j in 0..hn-1
+            z[j] = @v[j][hn-1] 
+            for i in 0..9
+                z[j] += x[i] * @v[i][j]
             end
+            z[j] = 1.0/ (1+ Math.exp(-z[j]))
         end
 
         y = []
-        y_in.each { |i| y << (i >= 0 ? 1 : -1) }
+        sr = []
+        for k in 0..2
+            y[k] = @w[hn-1][k] 
+            for j in 0..hn-1
+                y[k] += z[j] * @w[j][k]
+            end
+            y[k] = 1.0/ (1+ Math.exp(-y[k]))
+            sr << (y[k] >= 0.50 ? 1 : -1)
+        end
 
-        if y == [-1,-1,-1]
-            min = y_in[0].abs
+        if sr == [-1,-1,-1]
+            min = y[0].abs
             min_index = 0
-            for i in 1..y_count-1
-                if y_in[i].abs < min
-                    min = y_in[i].abs
+            for i in 1..2
+                if y[i].abs < min
+                    min = y[i].abs
                     min_index = i
                 end
             end
             y[min_index] = 1
         end
 
-        if y != se && !is_test
-            for i in 0..y_count-1
-                for j in 0..x_count-1
-                     @weights[i][j] += @alpha * ( se[i] - y[i] ) * x[j] 
-                end   
+        if se != sr && !is_test
+            dy = []
+            dz = []
+            
+            for k in 0..2
+                dy << ( se[k] - sr[k] ) * y[k] * ( 1 - y[k] )
+            end
+
+            for j in 0..hn-1
+                dz[j] = 0
+                for k in 0..2
+                    dz[j] += dy[k]*@w[j][k]
+                end
+                dz[j] *= z[j]*(1-z[j])
+            end
+            
+            for i in 0..9
+                for j in 0..hn-1
+                    @v[i][j] += @alpha*x[i]*dz[j]
+                end
+            end
+
+            for j in 0..hn-1
+                for k in 0..2
+                    @w[j][k] += @alpha*z[j]*dy[k]
+                end
             end
         end
-
-        right_answers += 1 if y == se && is_test
+        
+        right_answers += 1 if se == sr && is_test
     end
-    puts "Perceptron \t-> #{ 100* right_answers /tmax }%" if is_test
+    puts "MLP \t\t-> #{ 100* right_answers /tmax }%" if is_test
 end
 
 #todos dados
@@ -137,10 +164,12 @@ trainning = fill_array(all_data, 0, 999)
 #      classe 3: 1320 - 1472
 test = fill_array(all_data, 1000, all_data.count-1)
 
-@alpha = 0.4             # taxa 
+@alpha = 0.5             # taxa 
 tmax = 10000
+hidden_nodes = 3 # quantidade de nós na camada invisivel
 
-@weights = init_weights(3,10, false) # pesos perceptron
+@v = init_weights(10, hidden_nodes, true) # pesos mlp
+@w = init_weights(hidden_nodes+1,  3, true) # pesos mlp
 
-perceptron(trainning, false, tmax)
-perceptron(test, true, test.count)
+mlp(trainning, false, tmax, hidden_nodes)
+mlp(test, true, test.count, hidden_nodes)
