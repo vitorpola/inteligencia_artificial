@@ -9,6 +9,21 @@ def read_file(file_name)
     return a
 end
 
+
+# retorna um array removendo a colunas indicadas
+def remove_column(data, cols)
+    num_cols = data.first.count
+
+    data.each do |d|
+        cols.each do |c|
+            d.delete_at(c)
+        end
+    end
+    
+    return data
+end
+
+
 # retorna um array a partir de um outro passado por parametro
 def fill_array(array, init, final)
     a = []
@@ -44,53 +59,80 @@ def result_convert(num)
 end
 
 # inicializar o pesos
-def init_weights(row, col, random)
+def init_weights(row, col)
     weights = []
     for i in 0..row-1
         weights << []
         for j in 0..col-1
-            weights[i] << (random  ? Random.rand(-1.0..1.0) : 0)
+            weights[i] <<  Random.rand(-0.5..0.5).round(4)
         end
     end
     weights
 end
 
+# inicializar o pesos Nguyen Windrow
+def init_weights_nw(row, col)
+    weights = []
+    w_old = []
+    beta = 0.7 * (row ** (1/col))
+    for i in 0..row-1
+        weights << []
+        for j in 0..col-1
+            weights[i] <<  Random.rand(-0.5..0.5).round(2)
+        end
+    end
+
+    for i in 0..row-1
+        w_old << 0
+        for j in 0..col-1
+            w_old[i] += weights[i][j] ** 2
+        end
+        w_old[i] = Math.sqrt(w_old.last)
+    end
+
+    for i in 1..row-1
+        w_old
+        for j in 0..col-1
+            weights[i][j] = weights[i][j] * beta / w_old[i] 
+        end
+    end
+    
+    weights
+end
+
 def mlp(array_data, is_test, tmax, hn)
+    x_count = array_data.first.count-1
     right_answers = 0 if is_test
     for t in 1..tmax
         if is_test
             line = t-1
         else
-            if t%3 == 1
-                line = Random.rand(0..414)
-            elsif t%3 == 2
-                line = Random.rand(415..641)
-            else
-                line = Random.rand(642..999)
-            end
+            line = Random.rand(0..999)
         end
 
         x = []
-        for i in 0..8 
+        for i in 0..x_count-1
             x << array_data[line][i]
         end
         x << 1
-        se = result_convert(array_data[line][9])
+        se = result_convert(array_data[line].last)
 
         z = []
         for j in 0..hn-1
-            z[j] = @v[j][hn-1] 
-            for i in 0..9
+            z[j] = @v.last[j]
+            for i in 0..x_count-1
                 z[j] += x[i] * @v[i][j]
             end
             z[j] = 1.0/ (1+ Math.exp(-z[j]))
         end
 
+        z << 1
+
         y = []
         sr = []
         for k in 0..2
-            y[k] = @w[hn-1][k] 
-            for j in 0..hn-1
+            y[k] = @w[0][k] 
+            for j in 1..hn
                 y[k] += z[j] * @w[j][k]
             end
             y[k] = 1.0/ (1+ Math.exp(-y[k]))
@@ -125,7 +167,7 @@ def mlp(array_data, is_test, tmax, hn)
                 dz[j] *= z[j]*(1-z[j])
             end
             
-            for i in 0..9
+            for i in 0..x_count
                 for j in 0..hn-1
                     @v[i][j] += @alpha*x[i]*dz[j]
                 end
@@ -140,16 +182,21 @@ def mlp(array_data, is_test, tmax, hn)
         
         right_answers += 1 if se == sr && is_test
     end
-    puts "MLP \t\t-> #{ 100* right_answers /tmax }%" if is_test
+    return right_answers /tmax.to_f if is_test
 end
+
 
 #todos dados
 all_data = read_file('cmc.data.txt')
+all_data = remove_column(all_data, [0,0,0,0,0,0])
+
+p all_data.first.inspect
+
+input_count = all_data.first.count - 1
 
 # normarlizar os dados
-for i in 0..8
-    all_data = normalize(all_data, i)
-    #puts all_data[0].inspect
+(0..all_data.first.count-2).each do |line|
+    all_data = normalize(all_data, line)
 end
 
 # dados treino
@@ -164,12 +211,23 @@ trainning = fill_array(all_data, 0, 999)
 #      classe 3: 1320 - 1472
 test = fill_array(all_data, 1000, all_data.count-1)
 
-@alpha = 0.5             # taxa 
-tmax = 10000
-hidden_nodes = 3 # quantidade de nós na camada invisivel
+@alpha = 0.45             # taxa 
+tmax = 100
+hnode = 2 # quantidade de nós na camada invisivel
 
-@v = init_weights(10, hidden_nodes, true) # pesos mlp
-@w = init_weights(hidden_nodes+1,  3, true) # pesos mlp
+sum = 0
 
-mlp(trainning, false, tmax, hidden_nodes)
-mlp(test, true, test.count, hidden_nodes)
+@v = init_weights(input_count+1, hnode) # pesos mlp
+
+puts @v.inspect
+
+@w = init_weights(hnode+1,  3) # pesos mlp
+
+puts @w.inspect
+
+mlp(trainning, false, tmax, hnode)
+res =  mlp(test, true, test.count, hnode)
+
+p (100*res).round(2).to_s + '%'
+
+
