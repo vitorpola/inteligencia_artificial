@@ -34,34 +34,12 @@ def init_weights
     w
 end
 
-def init_matrix
-    m = []
-    for i in 0..@N_matrix-1
-        m << []
-        for j in 0..@N_matrix-1
-            m[i][j] = 0
-        end
-    end
-    m
-end
-
-def print_matrix(m)
-    for i in 0..@N_matrix-1
-        for j in 0..@N_matrix-1
-            print m[i][j].to_s + ' '
-        end
-        puts '|'
-    end
-end
-
-
 def get_influence(t, d)
     alpha(Math.sqrt(d.to_f), t.to_f) * learning_rate(t)
 end
 
 def kohonen(array_data, is_test)
 
-    matrix = init_matrix  if is_test
     lines = [[],[],[]] if is_test
     columns = [[],[],[]] if is_test
 
@@ -89,7 +67,6 @@ def kohonen(array_data, is_test)
         end
 
         if is_test
-            matrix[winner_row][winner_col] = x.last
             lines[x.last-1] <<  winner_row
             columns[x.last-1] <<  winner_col
         else
@@ -107,7 +84,7 @@ def kohonen(array_data, is_test)
         end
         system "clear"
         system "cls"
-        print "#{(t*100.0/@tmax).round(2)}%" 
+        puts "#{(t*100.0/@tmax).round(2)}%" 
     end
     puts 'Grafico gerado em result/kohonen.html'
     {lines: lines, columns: columns} if is_test
@@ -117,8 +94,8 @@ end
 all_data = read_file('data/cmc.data.txt')
 
 @N_x = 9
-@N_matrix = 100
-@tmax = 10000
+@N_matrix = 10
+@tmax = 100
 @learn_rate = 0.1
 
 selected_data = choose_data(all_data, 0.8)
