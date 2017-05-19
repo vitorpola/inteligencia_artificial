@@ -1,8 +1,8 @@
 load 'utils.rb' 
 
 def perceptron(array_data, is_test, tmax)
-    x_count = 9
-    y_count = 3
+    @N_x = 9
+    @N_y = 3
 
     right_answers = 0 if is_test
     for t in 1..tmax
@@ -19,16 +19,16 @@ def perceptron(array_data, is_test, tmax)
         end
 
         x = []
-        for i in 0..x_count-1 
+        for i in 0..@N_x-1 
             x << array_data[line][i]
         end
         x << 1
-        se = result_convert(array_data[line][x_count])
+        se = result_convert(array_data[line].last)
 
         y_in = [0,0,0]
 
-        for i in 0..y_count-1
-            for j in 0..x_count
+        for i in 0..@N_y-1
+            for j in 0..@N_x
                 y_in[i] += x[j] * @weights[i][j]
             end
         end
@@ -39,7 +39,7 @@ def perceptron(array_data, is_test, tmax)
         if y == [-1,-1,-1]
             min = y_in[0].abs
             min_index = 0
-            for i in 1..y_count-1
+            for i in 1..@N_y-1
                 if y_in[i].abs < min
                     min = y_in[i].abs
                     min_index = i
@@ -49,8 +49,8 @@ def perceptron(array_data, is_test, tmax)
         end
 
         if y != se && !is_test
-            for i in 0..y_count-1
-                for j in 0..x_count-1
+            for i in 0..@N_y-1
+                for j in 0..@N_x-1
                      @weights[i][j] += @alpha * ( se[i] - y[i] ) * x[j] 
                 end   
             end
@@ -62,7 +62,7 @@ def perceptron(array_data, is_test, tmax)
 end
 
 #todos dados
-all_data = read_file('cmc.data.txt')
+all_data = read_file('data/cmc.data.txt')
 
 # normarlizar os dados
 for i in 0..8
@@ -84,8 +84,10 @@ test = fill_array(all_data, 1000, all_data.count-1)
 
 @alpha = 0.4             # taxa 
 tmax = 10000
+@N_x = all_data.first.count-1 # número de features (entradas X)
+@N_y = 3 # número de classe (camada Y)
 
-@weights = init_weights(3,10, false) # pesos perceptron
+@weights = init_weights(@N_y, @N_x+1) # pesos perceptron
 
 perceptron(trainning, false, tmax)
 perceptron(test, true, test.count)

@@ -1,90 +1,97 @@
 load 'utils.rb' 
 
-def mlp(array_data, is_test, tmax, hn)
-    x_N = array_data.first.count-1 
-    z_N = hn
-    y_N = 3
-
+def mlp(array_data, is_test, tmax)
     right_answers = 0 if is_test
     for t in 1..tmax
+        z = []
+        y = []
+        sr = []
+        x = []
+
         if is_test
             line = t-1
         else
+            c1 = 43*array_data.count/100
+            c2 = 23*array_data.count/100
             if t%3 == 1
-                line = Random.rand(0..414)
+                line = Random.rand(0..c1-1)
             elsif t%3 == 2
-                line = Random.rand(415..641)
+                line = Random.rand(c1..c1+c2)
             else
-                line = Random.rand(642..999)
+                line = Random.rand(c1+c2..array_data.count-1)
             end
         end
 
-        x = []
-        for i in 0..x_N-1
+        for i in 0..@N_x-1
             x << array_data[line][i]
         end
         x << 1
+        #se = [array_data[line].last == 1 ? 1 : -1]   # para uma classe
         se = result_convert(array_data[line].last)
 
-        z = []
-        for j in 0..z_N-1
-            z[j] = @v.last[j]
-            for i in 0..x_N-1
-                z[j] += x[i] * @v[i][j]
+        # propaga de x para z
+        for j in 0..@N_z-1
+            z_in = 0
+            for i in 0..@N_x
+                z_in += x[i] * @v[i][j]
             end
-            z[j] = 1.0/ (1+ Math.exp(-z[j]))
+            z << 1.0 / (1+ Math.exp( -z_in ))
         end
-
         z << 1
 
-        y = []
-        sr = []
-        for k in 0..y_N-1
-            y[k] = @w.last[k] 
-            for j in 0..z_N-1
-                y[k] += z[j] * @w[j][k]
+        # propaga de z para y
+        for k in 0..@N_y-1
+            y_in = 0
+            for j in 0..@N_z
+                y_in += z[j] * @w[j][k]
             end
-            y[k] = 1.0/ (1+ Math.exp(-y[k]))
-            sr << (y[k] >= 0.50 ? 1 : -1)
+            y << 1.0 / ( 1 + Math.exp( -y_in ))
+            sr << (y[k] >= 0.5 ? 1 : -1)
         end
 
+        # ajuste 
         if sr == [-1,-1,-1]
             min = y[0].abs
             min_index = 0
-            for i in 1..y_N-1
+            for i in 1..@N_y-1
                 if y[i].abs < min
                     min = y[i].abs
                     min_index = i
                 end
             end
-            y[min_index] = 1
+            sr[min_index] = 1
         end
 
+        # se errou, backpropagation
         if se != sr && !is_test
             dy = []
             dz = []
             
-            for k in 0..y_N-1
+            # calcular delta y            
+            for k in 0..@N_y-1
                 dy << ( se[k] - sr[k] ) * y[k] * ( 1 - y[k] )
             end
-
-            for j in 0..z_N
-                dz[j] = 0
-                for k in 0..y_N-1
-                    dz[j] += dy[k]*@w[j][k]
+            
+            # calcular delta z
+            for j in 0..@N_z
+                sum = 0
+                for k in 0..@N_y-1
+                    sum += dy[k]*@w[j][k]
                 end
-                dz[j] *= z[j]*(1-z[j])
+                dz[j] = sum * z[j] * ( 1 - z[j] )
+            end
+
+            #atualiza pesos W
+            for j in 0..@N_z
+                for k in 0..@N_y-1
+                    @w[j][k] += @alpha*z[j]*dy[k]
+                end
             end
             
-            for i in 0..x_N
-                for j in 0..z_N-1
+            #atualiza pesos V
+            for i in 0..@N_x
+                for j in 0..@N_z-1
                     @v[i][j] += @alpha*x[i]*dz[j]
-                end
-            end
-
-            for j in 0..z_N
-                for k in 0..y_N-1
-                    @w[j][k] += @alpha*z[j]*dy[k]
                 end
             end
         end
@@ -95,38 +102,40 @@ def mlp(array_data, is_test, tmax, hn)
 end
 
 #todos dados
-all_data = read_file('cmc.data.txt')
-all_data = remove_column(all_data, [0])
+all_data = read_file('data/cmc.data.txt')
+#all_data = read_file('data/xor.txt')
 
-input_count = all_data.first.count - 1
+#remover feature
+all_data = remove_column(all_data, [6])
+
+@N_x = all_data.first.count-1 # número de features (entradas X)
+@N_z = 9 # número de nós ocultos (camada Z)
+@N_y = 3 # número de classe (camada Y)
 
 # normarlizar os dados
-(0..all_data.first.count-2).each do |line|
-    all_data = normalize(all_data, line)
+(0..@N_x-1).each do |feature|
+    all_data = normalize(all_data, feature)
 end
 
+selected_data = choose_data(all_data, 0.55)
 # dados treino
-#      classe 1: 0   - 414
-#      classe 2: 415 - 641
-#      classe 3: 642 - 999
-trainning = fill_array(all_data, 0, 999)
-
+trainning = selected_data[0]
 # dados teste
-#      classe 1: 1000- 1213
-#      classe 2: 1214 - 1319
-#      classe 3: 1320 - 1472
-test = fill_array(all_data, 1000, all_data.count-1)
+test = selected_data[1]
 
-@alpha = 0.8             # taxa 
-tmax = 1000
-hnode = 5 # quantidade de nós na camada invisivel
+tmax = 20000
+@alpha = 0.7           # taxa 
 
-@v = init_weights(input_count+1, hnode) # pesos mlp
-@w = init_weights(hnode+1,  3) # pesos mlp
+#  inicializar pesos
+@v = init_weights( @N_x + 1, @N_z )
+@v = nguyen_windrow( @v )
+@w = init_weights( @N_z + 1, @N_y )
 
-mlp(trainning, false, tmax, hnode)
-res =  mlp(test, true, test.count, hnode)
+mlp(trainning, false, tmax)
+res=mlp(test, true, test.count)
 
-p (100*res).to_s + '%'
+#mlp(all_data, false, tmax)
+#res=mlp(all_data, true, all_data.count)
 
-
+p (100*res).to_s + '%' 
+ 
